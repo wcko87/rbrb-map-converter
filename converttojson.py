@@ -9,12 +9,12 @@ DIR_EDITABLE_MAPS = './s2_editable_maps'
 DIR_FINAL_MAPS = './s3_final_maps'
 
 MAP_SIZE = 100000
-MAP_TILE_SIZE = 450
+MINIMAP_SIZE = 450
 
 ARRAY_MAP = 0
 ARRAY_EVENT = 200000
 ARRAY_ROOMTYPE = 400000
-ARRAY_ROOMCOLOUR = 400900
+ARRAY_ROOMCOLOR = 400900
 ARRAY_ROOMBG = 401800
 ARRAY_ITEMS = 402700
 ARRAY_TILES_0 = 602704
@@ -52,9 +52,8 @@ def collision_data_to_layer(data, name):
         "data": transpose_d2l([idmap(i) for i in data])
     }
 
-def object_data_to_layer(data, name):
+def object_data_to_layer(data, name, color):
     def make_object(index, value):
-        x, y = index//200, index%200
         return {
             "width": 32,
             "height": 32,
@@ -65,14 +64,15 @@ def object_data_to_layer(data, name):
     objects = [make_object(i, o) for i, o in enumerate(data) if o != 0]
 
     return {
-         "draworder":"topdown",
-         "name": name,
-         "objects": objects,
-         "opacity":1,
-         "type":"objectgroup",
-         "visible": True,
-         "x":0,
-         "y":0,
+        "draworder":"topdown",
+        "name": name,
+        "objects": objects,
+        "opacity":1,
+        "color": color,
+        "type":"objectgroup",
+        "visible": True,
+        "x":0,
+        "y":0,
     }
 
 def tile_data_to_layer(data, name):
@@ -99,6 +99,32 @@ def tile_data_to_layer(data, name):
         "name": name,
         "data": transpose_d2l([idmap(i) for i in data])
     }
+
+def minimap_data_to_layer(data, name, color, visible=True):
+    def make_object(index, value):
+        x, y = index//18, index%18
+        return {
+            "width": 640,
+            "height": 352,
+            "x": 640*x,
+            "y": 32 * (11*y + (y+3)//4),
+            "name": str(value)
+        }
+    objects = [make_object(i, o) for i, o in enumerate(data)]
+
+    return {
+        "draworder":"topdown",
+        "name": name,
+        "objects": objects,
+        "color": color,
+        "opacity": 0.35,
+        "locked": True,
+        "type":"objectgroup",
+        "visible": visible,
+        "x":0,
+        "y":0,
+    }
+
 
 def collision_layer_to_data(layer_data, firstgid):
     def rev_idmap(i):
@@ -128,6 +154,19 @@ def tile_layer_to_data(layer_data, firstgid):
         return dataid
     return transpose_l2d([rev_idmap(i) for i in layer_data['data']])
 
+def minimap_layer_to_data(layer_data):
+    data = [0]*MINIMAP_SIZE
+
+    for item in layer_data['objects']:
+        value = int(item['name'])
+        x = item['x']//640
+        y = item['y']//32
+        y = 4*(y//45) + max(0,y%45-1)//11
+        index = x*18 + y
+        data[index] = value
+
+    return data
+
 def map_to_json(filename):
     print('Converting Original map file -> Json : %s' % filename)
     # location of source map file
@@ -144,11 +183,11 @@ def map_to_json(filename):
     tiledata_items = list(struct.unpack('%dh' % MAP_SIZE, f.read(MAP_SIZE*2)))
     
     f.seek(ARRAY_ROOMTYPE)
-    tiledata_roomtype = list(struct.unpack('%dh' % MAP_TILE_SIZE, f.read(MAP_TILE_SIZE*2)))
-    f.seek(ARRAY_ROOMCOLOUR)
-    tiledata_roomcolour = list(struct.unpack('%dh' % MAP_TILE_SIZE, f.read(MAP_TILE_SIZE*2)))
+    tiledata_roomtype = list(struct.unpack('%dh' % MINIMAP_SIZE, f.read(MINIMAP_SIZE*2)))
+    f.seek(ARRAY_ROOMCOLOR)
+    tiledata_roomcolor = list(struct.unpack('%dh' % MINIMAP_SIZE, f.read(MINIMAP_SIZE*2)))
     f.seek(ARRAY_ROOMBG)
-    tiledata_roombg = list(struct.unpack('%dh' % MAP_TILE_SIZE, f.read(MAP_TILE_SIZE*2)))
+    tiledata_roombg = list(struct.unpack('%dh' % MINIMAP_SIZE, f.read(MINIMAP_SIZE*2)))
     
     f.seek(ARRAY_TILES_0)
     tiledata_tiles0 = list(struct.unpack('%dh' % MAP_SIZE, f.read(MAP_SIZE*2)))
@@ -169,11 +208,6 @@ def map_to_json(filename):
     # layer draw order: 0 3 4 1 5 6 2
     layers = [
         collision_data_to_layer(tiledata_map, "collision"),
-        object_data_to_layer(tiledata_event, "event"),
-        object_data_to_layer(tiledata_items, "items"),
-        #collision_data_to_layer(tiledata_roomtype, "roomtype"),
-        #collision_data_to_layer(tiledata_roomcolour, "roomcolour"),
-        #collision_data_to_layer(tiledata_roombg, "roombg"),
         tile_data_to_layer(tiledata_tiles0, "tiles0"),
         tile_data_to_layer(tiledata_tiles3, "tiles3"),
         tile_data_to_layer(tiledata_tiles4, "tiles4"),
@@ -181,6 +215,11 @@ def map_to_json(filename):
         tile_data_to_layer(tiledata_tiles5, "tiles5"),
         tile_data_to_layer(tiledata_tiles6, "tiles6"),
         tile_data_to_layer(tiledata_tiles2, "tiles2"),
+        object_data_to_layer(tiledata_event, "event", "#8080ff"),
+        object_data_to_layer(tiledata_items, "items", "#ff6000"),
+        minimap_data_to_layer(tiledata_roomtype, "roomtype", "#00ffff", visible=False),
+        minimap_data_to_layer(tiledata_roomcolor, "roomcolor", "#ffff00", visible=False),
+        minimap_data_to_layer(tiledata_roombg, "roombg", "#00ff00", visible=False),
     ]
 
     data = {
@@ -234,6 +273,9 @@ def json_to_map(filename):
         "collision": collision_layer_to_data(layers["collision"], GID_COLLISION),
         "event": object_layer_to_data(layers["event"]),
         "items": object_layer_to_data(layers["items"]),
+        "roomtype": minimap_layer_to_data(layers["roomtype"]) if "roomtype" in layers else None,
+        "roomcolor": minimap_layer_to_data(layers["roomcolor"]) if "roomcolor" in layers else None,
+        "roombg": minimap_layer_to_data(layers["roombg"]) if "roombg" in layers else None,
         "tiles0": tile_layer_to_data(layers["tiles0"], GID_TILES),
         "tiles3": tile_layer_to_data(layers["tiles3"], GID_TILES),
         "tiles4": tile_layer_to_data(layers["tiles4"], GID_TILES),
@@ -250,6 +292,15 @@ def json_to_map(filename):
     f.write(struct.pack('%dh' % MAP_SIZE, *map_arrays['event']))
     f.seek(ARRAY_ITEMS)
     f.write(struct.pack('%dh' % MAP_SIZE, *map_arrays['items']))
+    if map_arrays["roomtype"]:
+        f.seek(ARRAY_ROOMTYPE)
+        f.write(struct.pack('%dh' % MINIMAP_SIZE, *map_arrays["roomtype"]))
+    if map_arrays["roomcolor"]:
+        f.seek(ARRAY_ROOMCOLOR)
+        f.write(struct.pack('%dh' % MINIMAP_SIZE, *map_arrays["roomcolor"]))
+    if map_arrays["roombg"]:
+        f.seek(ARRAY_ROOMBG)
+        f.write(struct.pack('%dh' % MINIMAP_SIZE, *map_arrays["roombg"]))
     f.seek(ARRAY_TILES_0)
     f.write(struct.pack('%dh' % MAP_SIZE, *map_arrays['tiles0']))
     f.seek(ARRAY_TILES_1)

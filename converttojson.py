@@ -108,6 +108,7 @@ def minimap_data_to_layer(data, name, color, visible=True):
             "height": 352,
             "x": 640*x,
             "y": 32 * (11*y + (y+3)//4),
+            "type": "(%d, %d)" % (x,y),
             "name": str(value)
         }
     objects = [make_object(i, o) for i, o in enumerate(data)]

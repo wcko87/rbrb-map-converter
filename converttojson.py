@@ -17,6 +17,7 @@ ARRAY_ROOMTYPE = 400000
 ARRAY_ROOMCOLOR = 400900
 ARRAY_ROOMBG = 401800
 ARRAY_ITEMS = 402700
+INT_AREA = 602700
 ARRAY_TILES_0 = 602704
 ARRAY_TILES_1 = 802704
 ARRAY_TILES_2 = 1002704
@@ -24,6 +25,7 @@ ARRAY_TILES_3 = 1202704
 ARRAY_TILES_4 = 1402704
 ARRAY_TILES_5 = 1602704
 ARRAY_TILES_6 = 1802704
+INT_VERSION = 2602704
 
 COLLISION_TILESET_OFFSET = 5000
 
@@ -190,6 +192,9 @@ def map_to_json(filename):
     f.seek(ARRAY_ROOMBG)
     tiledata_roombg = list(struct.unpack('%dh' % MINIMAP_SIZE, f.read(MINIMAP_SIZE*2)))
     
+    f.seek(INT_AREA)
+    metadata_area = list(struct.unpack('i', f.read(4)))[0]
+    
     f.seek(ARRAY_TILES_0)
     tiledata_tiles0 = list(struct.unpack('%dh' % MAP_SIZE, f.read(MAP_SIZE*2)))
     f.seek(ARRAY_TILES_1)
@@ -204,6 +209,9 @@ def map_to_json(filename):
     tiledata_tiles5 = list(struct.unpack('%dh' % MAP_SIZE, f.read(MAP_SIZE*2)))
     f.seek(ARRAY_TILES_6)
     tiledata_tiles6 = list(struct.unpack('%dh' % MAP_SIZE, f.read(MAP_SIZE*2)))
+    
+    f.seek(INT_VERSION)
+    metadata_version = list(struct.unpack('i', f.read(4)))[0]
     f.close()
 
     # layer draw order: 0 3 4 1 5 6 2
@@ -234,12 +242,22 @@ def map_to_json(filename):
         "tilesets":[
             {
              "firstgid": 1,
-             "source":"TILE_A.tsx"
+             "source":"TILE_A.tsx",
             }, 
             {
              "firstgid":COLLISION_TILESET_OFFSET,
-             "source":"collision.tsx"
+             "source":"collision.tsx",
             }],
+        "properties":
+            {
+             "area": metadata_area,
+             "version": metadata_version,
+            },
+        "propertytypes":
+            {
+             "area":"int",
+             "version":"int",
+            },
         "type":"map",
         "version":1,
         "layers": layers,

@@ -1,3 +1,3 @@
 @echo off
-bin\converttojson.exe map_to_json
+bin\converttojson.exe --map-to-json
 pause

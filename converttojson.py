@@ -3,10 +3,25 @@ import struct
 import json
 import os
 import sys
+import argparse
 
-DIR_ORIGINAL_MAPS = './s1_original_maps'
-DIR_EDITABLE_MAPS = './s2_editable_maps'
-DIR_FINAL_MAPS = './s3_final_maps'
+#settings.original_maps_dir = './s1_original_maps'
+#settings.editable_maps_dir = './s2_editable_maps'
+#settings.final_maps_dir = './s3_final_maps'
+
+def parse_args():
+    args = argparse.ArgumentParser(description='Rabi-Ribi Map Converter')
+    args.add_argument('-original-maps-dir', default='./s1_original_maps', help='Source directory for original maps. Defaults to s1_original_maps/. Do not make the original maps dir the final maps dir.')
+    args.add_argument('-editable-maps-dir', default='./s2_editable_maps', help='Directory for editable json maps. Defaults to s2_editable_maps/. Tilesets should be placed in this directory.')
+    args.add_argument('-final-maps-dir', default='./s3_final_maps', help='Output directory for final map files. Defaults to s3_final_maps/. Do not make the original maps dir the final maps dir.')
+    args.add_argument('--map-to-json', action='store_true', help='Use to convert original map files to editable json files.')
+    args.add_argument('--json-to-map', action='store_true', help='Use to convert editable json files to final map files.')
+
+    return args.parse_args(sys.argv[1:])
+
+def fail(message):
+    print('Error! %s' % message)
+    sys.exit(1)
 
 MAP_SIZE = 100000
 MINIMAP_SIZE = 450
@@ -170,11 +185,11 @@ def minimap_layer_to_data(layer_data):
 
     return data
 
-def map_to_json(filename):
+def map_to_json(filename, settings):
     print('Converting Original map file -> Json : %s' % filename)
     # location of source map file
-    sourcefile = "%s/%s.map" % (DIR_ORIGINAL_MAPS, filename)
-    targetfile = "%s/%s.json" % (DIR_EDITABLE_MAPS, filename)
+    sourcefile = "%s/%s.map" % (settings.original_maps_dir, filename)
+    targetfile = "%s/%s.json" % (settings.editable_maps_dir, filename)
     
     # LOADING MAP DATA
     f = open(sourcefile, "rb")
@@ -267,12 +282,12 @@ def map_to_json(filename):
     f.write(json.dumps(data))
     f.close()
 
-def json_to_map(filename):
+def json_to_map(filename, settings):
     print('Converting Json -> Final map file : %s' % filename)
     # location of source map file
-    basemapfile = "%s/%s.map" % (DIR_ORIGINAL_MAPS, filename)
-    sourcefile = "%s/%s.json" % (DIR_EDITABLE_MAPS, filename)
-    targetfile = "%s/%s.map" % (DIR_FINAL_MAPS, filename)
+    basemapfile = "%s/%s.map" % (settings.original_maps_dir, filename)
+    sourcefile = "%s/%s.json" % (settings.editable_maps_dir, filename)
+    targetfile = "%s/%s.map" % (settings.final_maps_dir, filename)
     shutil.copyfile(basemapfile, targetfile)
 
     f = open(sourcefile)
@@ -342,13 +357,16 @@ def is_extension(ext):
 trim_extension = lambda f : f[:f.rfind('.')]
 
 def main():
-    if len(sys.argv) <= 1: return
-    if sys.argv[1] == 'map_to_json':
-        filenames = list(map(trim_extension, filter(is_extension('map'), os.listdir(DIR_ORIGINAL_MAPS))))
+    settings = parse_args()
+    if settings.map_to_json == settings.json_to_map:
+        fail('Either convert --map-to-json or --json-to-map. Not both or none.')
+
+    if settings.map_to_json:
+        filenames = list(map(trim_extension, filter(is_extension('map'), os.listdir(settings.original_maps_dir))))
         has_override = False
         for filename in filenames:
-            if os.path.isfile('%s/%s.json' % (DIR_EDITABLE_MAPS, filename)):
-                print('The file %s/%s.json already exists.' % (DIR_EDITABLE_MAPS, filename))
+            if os.path.isfile('%s/%s.json' % (settings.editable_maps_dir, filename)):
+                print('The file %s/%s.json already exists.' % (settings.editable_maps_dir, filename))
                 has_override = True
 
         if has_override:
@@ -358,26 +376,26 @@ def main():
             quit()
 
         for filename in filenames:
-            map_to_json(filename)
+            map_to_json(filename, settings)
 
-    elif sys.argv[1] == 'json_to_map':
-        filenames = list(map(trim_extension, filter(is_extension('json'), os.listdir(DIR_EDITABLE_MAPS))))
+    elif settings.json_to_map:
+        filenames = list(map(trim_extension, filter(is_extension('json'), os.listdir(settings.editable_maps_dir))))
         has_missing_map = False
         for filename in filenames:
-            if not os.path.isfile('%s/%s.map' % (DIR_ORIGINAL_MAPS, filename)):
-                print('The map %s/%s.map is missing!' % (DIR_ORIGINAL_MAPS, filename))
+            if not os.path.isfile('%s/%s.map' % (settings.original_maps_dir, filename)):
+                print('The map %s/%s.map is missing!' % (settings.original_maps_dir, filename))
                 has_missing_map = True
         if has_missing_map:
             print('There are missing maps from %s! We cannot generate map files from the '
-                '.json files if the corresponding original .map files are not present.' % DIR_ORIGINAL_MAPS)
+                '.json files if the corresponding original .map files are not present.' % settings.original_maps_dir)
             quit()
 
         for filename in filenames:
-            if os.path.isfile('%s/%s.map' % (DIR_FINAL_MAPS, filename)):
-                print('Automatically overriding %s/%s.map.' % (DIR_FINAL_MAPS, filename))
+            if os.path.isfile('%s/%s.map' % (settings.final_maps_dir, filename)):
+                print('Automatically overriding %s/%s.map.' % (settings.final_maps_dir, filename))
 
         for filename in filenames:
-            json_to_map(filename)
+            json_to_map(filename, settings)
 
 
 

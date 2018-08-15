@@ -16,12 +16,16 @@ def parse_args():
     args.add_argument('-final-maps-dir', default='./s3_final_maps', help='Output directory for final map files. Defaults to s3_final_maps/. Do not make the original maps dir the final maps dir.')
     args.add_argument('--map-to-json', action='store_true', help='Use to convert original map files to editable json files.')
     args.add_argument('--json-to-map', action='store_true', help='Use to convert editable json files to final map files.')
+    args.add_argument('--bunmania', action='store_true', help='Convert in bunmania mode.')
 
     return args.parse_args(sys.argv[1:])
 
 def fail(message):
-    print('Error! %s' % message)
+    print('ERROR! %s' % message)
     sys.exit(1)
+
+def warn(message):
+    print('WARNING: %s' % message)
 
 MAP_SIZE = 100000
 MINIMAP_SIZE = 450
@@ -267,11 +271,13 @@ def map_to_json(filename, settings):
             {
              "area": metadata_area,
              "version": metadata_version,
+             "bunmania": False,
             },
         "propertytypes":
             {
              "area":"int",
              "version":"int",
+             "bunmania":"bool",
             },
         "type":"map",
         "version":1,
@@ -281,6 +287,71 @@ def map_to_json(filename, settings):
     f = open(targetfile, 'w+')
     f.write(json.dumps(data))
     f.close()
+
+def read_metadata(properties, property_types):
+    metadata = {}
+
+    def set_metadata(property_name, value):
+        metadata[property_name] = value
+
+    def get_property(property_name, property_type, default_value):
+        if property_name not in properties:
+            warn('property %s not found. using default value of %s' % (property_name, default_value))
+            return set_metadata(property_name, default_value)
+        if property_name not in property_types:
+            warn('property %s not found. using default value of %s' % (property_name, default_value))
+            return set_metadata(property_name, default_value)
+        if property_types[property_name] != property_type:
+            fail('property %s has wrong type. should be %s, not %s' % (property_name, property_type, property_types[property_name]))
+
+        set_metadata(property_name, properties[property_name])
+
+    get_property('name', 'string', 'untitled')
+    get_property('author', 'string', '-')
+    get_property('par5', 'float', 150)
+    get_property('par4', 'float', 110)
+    get_property('par3', 'float', 90)
+    get_property('par2', 'float', 75)
+    get_property('par1', 'float', 60)
+    get_property('fullexp', 'bool', False)
+
+    return metadata
+
+def apply_metadata(map_arrays, metadata):
+    def get_string_data(string_name, string, charlimit):
+        if len(string) > charlimit: fail('%s cannot be longer than %d chars.' % (string_name, charlimit))
+        if not all(ord(c) < 128 for c in string): fail('%s must use only ASCII characters.' % string_name)
+
+        return (5000+ord(c) for c in string)
+
+    def get_time_data(time_name, time_value):
+        if time_value <= 0: fail('Time %s cannot be negative or zero.' % time_name)
+        if time_value >= 3600: fail('Time %s exceeds 60 minutes.' % time_name)
+
+        mins = int(time_value//60)
+        secs = int(time_value%60)
+        millis = int(time_value%1 * 60)
+
+        return (5000+x for x in (mins, secs, millis))
+
+    def get_bool_data(bool_name, bool_value):
+        return (5000+(1 if bool_value else 0),)
+
+    def write_into_row(row, data):
+        for x, v in enumerate(data):
+            map_arrays['event'][row+200*x] = v
+
+    write_into_row(0, get_string_data('map name', metadata['name'], 16))
+    write_into_row(1, get_string_data('author name', metadata['author'], 16))
+    
+    write_into_row(2, get_time_data('par5 (bronze)', metadata['par5']))
+    write_into_row(3, get_time_data('par4 (silver)', metadata['par4']))
+    write_into_row(4, get_time_data('par3 (gold)', metadata['par3']))
+    write_into_row(5, get_time_data('par2 (platinum)', metadata['par2']))
+    write_into_row(6, get_time_data('par1 (rainbow)', metadata['par1']))
+
+    write_into_row(7, get_bool_data('full exp', metadata['fullexp']))
+
 
 def json_to_map(filename, settings):
     print('Converting Json -> Final map file : %s' % filename)
@@ -293,6 +364,15 @@ def json_to_map(filename, settings):
     f = open(sourcefile)
     jsondata = json.loads(f.read())
     f.close()
+
+
+    bunmania_mode = settings.bunmania
+    if not bunmania_mode:
+        if 'bunmania' in jsondata['properties'] and jsondata['properties']['bunmania'] == True:
+            bunmania_mode = True
+
+    if bunmania_mode:
+        metadata = read_metadata(jsondata['properties'], jsondata['propertytypes'])
 
     for tileset in jsondata['tilesets']:
         if 'TILE_A' in tileset['source']:
@@ -318,6 +398,9 @@ def json_to_map(filename, settings):
         "tiles6": tile_layer_to_data(layers["tiles6"], GID_TILES),
         "tiles2": tile_layer_to_data(layers["tiles2"], GID_TILES),
     }
+
+    if bunmania_mode:
+        apply_metadata(map_arrays, metadata)
 
     f = open(targetfile, "r+b")
     f.seek(ARRAY_MAP)

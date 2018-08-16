@@ -9,14 +9,49 @@ import argparse
 #settings.editable_maps_dir = './s2_editable_maps'
 #settings.final_maps_dir = './s3_final_maps'
 
+DEFAULT_CONFIG = \
+"""
+original-maps-dir: s1_original_maps
+editable-maps-dir: s2_editable_maps
+final-maps-dir: s3_final_maps
+""".strip()
+
+def read_config():
+    CONFIG_FILE_NAME = './settings.txt'
+
+    # create config file if it doesn't exist.
+    if not os.path.isfile(CONFIG_FILE_NAME):
+        f = open(CONFIG_FILE_NAME, 'w+')
+        f.write(DEFAULT_CONFIG)
+        f.close()
+
+    config = {}
+    if os.path.isfile(CONFIG_FILE_NAME):
+        f = open(CONFIG_FILE_NAME)
+        lines = f.read().split('\n')
+        f.close()
+        for line in lines:
+            if ':' not in line: continue
+            key, value = (x.strip() for x in line.split(':', 1))
+            config[key] = value
+    else:
+        fail('settings file %s not found!' % CONFIG_FILE_NAME)
+    return config
+
 def parse_args():
+    config = read_config()
+    def check_for_key(keyname):
+        if keyname not in config: fail('config key not found: %s' % keyname)
+    check_for_key('original-maps-dir')
+    check_for_key('editable-maps-dir')
+    check_for_key('final-maps-dir')
+
     args = argparse.ArgumentParser(description='Rabi-Ribi Map Converter')
-    args.add_argument('-original-maps-dir', default='./s1_original_maps', help='Source directory for original maps. Defaults to s1_original_maps/. Do not make the original maps dir the final maps dir.')
-    args.add_argument('-editable-maps-dir', default='./s2_editable_maps', help='Directory for editable json maps. Defaults to s2_editable_maps/. Tilesets should be placed in this directory.')
-    args.add_argument('-final-maps-dir', default='./s3_final_maps', help='Output directory for final map files. Defaults to s3_final_maps/. Do not make the original maps dir the final maps dir.')
+    args.add_argument('-original-maps-dir', default=config['original-maps-dir'], help='Source directory for original maps. Defaults to s1_original_maps/. Do not make the original maps dir the final maps dir.')
+    args.add_argument('-editable-maps-dir', default=config['editable-maps-dir'], help='Directory for editable json maps. Defaults to s2_editable_maps/. Tilesets should be placed in this directory.')
+    args.add_argument('-final-maps-dir', default=config['final-maps-dir'], help='Output directory for final map files. Defaults to s3_final_maps/. Do not make the original maps dir the final maps dir.')
     args.add_argument('--map-to-json', action='store_true', help='Use to convert original map files to editable json files.')
     args.add_argument('--json-to-map', action='store_true', help='Use to convert editable json files to final map files.')
-    args.add_argument('--bunmania', action='store_true', help='Convert in bunmania mode.')
 
     return args.parse_args(sys.argv[1:])
 
@@ -296,13 +331,13 @@ def read_metadata(properties, property_types):
 
     def get_property(property_name, property_type, default_value):
         if property_name not in properties:
-            warn('property %s not found. using default value of %s' % (property_name, default_value))
+            warn('bunmania property %s not found. using default value of %s' % (property_name, default_value))
             return set_metadata(property_name, default_value)
         if property_name not in property_types:
-            warn('property %s not found. using default value of %s' % (property_name, default_value))
+            warn('bunmania property %s not found. using default value of %s' % (property_name, default_value))
             return set_metadata(property_name, default_value)
         if property_types[property_name] != property_type:
-            fail('property %s has wrong type. should be %s, not %s' % (property_name, property_type, property_types[property_name]))
+            fail('bunmania property %s has wrong type. should be %s, not %s' % (property_name, property_type, property_types[property_name]))
 
         set_metadata(property_name, properties[property_name])
 
@@ -365,11 +400,7 @@ def json_to_map(filename, settings):
     jsondata = json.loads(f.read())
     f.close()
 
-
-    bunmania_mode = settings.bunmania
-    if not bunmania_mode:
-        if 'bunmania' in jsondata['properties'] and jsondata['properties']['bunmania'] == True:
-            bunmania_mode = True
+    bunmania_mode = ('bunmania' in jsondata['properties'] and jsondata['properties']['bunmania'] == True)
 
     if bunmania_mode:
         metadata = read_metadata(jsondata['properties'], jsondata['propertytypes'])
@@ -453,10 +484,9 @@ def main():
                 has_override = True
 
         if has_override:
-            print('There are editable .json files that would be overwritten! '
+            fail('There are editable .json files that would be overwritten! '
                 'Please delete them manually before running this again. '
                 'We do not automatically override .json files as they may contain unsaved data.')
-            quit()
 
         for filename in filenames:
             map_to_json(filename, settings)
@@ -469,9 +499,8 @@ def main():
                 print('The map %s/%s.map is missing!' % (settings.original_maps_dir, filename))
                 has_missing_map = True
         if has_missing_map:
-            print('There are missing maps from %s! We cannot generate map files from the '
+            fail('There are missing maps from %s! We cannot generate map files from the '
                 '.json files if the corresponding original .map files are not present.' % settings.original_maps_dir)
-            quit()
 
         for filename in filenames:
             if os.path.isfile('%s/%s.map' % (settings.final_maps_dir, filename)):

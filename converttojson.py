@@ -16,6 +16,8 @@ editable-maps-dir: s2_editable_maps
 final-maps-dir: s3_final_maps
 """.strip()
 
+HAS_WARNINGS = False
+
 def read_config():
     CONFIG_FILE_NAME = './settings.txt'
 
@@ -57,9 +59,12 @@ def parse_args():
 
 def fail(message):
     print('ERROR! %s' % message)
+    print('\nFAILED TO CONVERT')
     sys.exit(1)
 
 def warn(message):
+    global HAS_WARNINGS
+    HAS_WARNINGS = True
     print('WARNING: %s' % message)
 
 MAP_SIZE = 100000
@@ -331,10 +336,10 @@ def read_metadata(properties, property_types):
 
     def get_property(property_name, property_type, default_value):
         if property_name not in properties:
-            warn('bunmania property %s not found. using default value of %s' % (property_name, default_value))
+            warn('bunmania property %s (%s) not found. using default value of %s' % (property_name, property_type, default_value))
             return set_metadata(property_name, default_value)
         if property_name not in property_types:
-            warn('bunmania property %s not found. using default value of %s' % (property_name, default_value))
+            warn('bunmania property %s (%s) not found. using default value of %s' % (property_name, property_type, default_value))
             return set_metadata(property_name, default_value)
         if property_types[property_name] != property_type:
             fail('bunmania property %s has wrong type. should be %s, not %s' % (property_name, property_type, property_types[property_name]))
@@ -513,3 +518,5 @@ def main():
 
 if __name__ == '__main__':
     main()
+    if HAS_WARNINGS:
+        sys.exit(1)

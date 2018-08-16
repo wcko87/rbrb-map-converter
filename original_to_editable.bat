@@ -1,3 +1,3 @@
 @echo off
 bin\converttojson.exe --map-to-json
-pause
+if errorlevel 1 pause

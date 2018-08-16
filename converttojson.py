@@ -312,12 +312,30 @@ def map_to_json(filename, settings):
              "area": metadata_area,
              "version": metadata_version,
              "bunmania": False,
+
+             "bm_name": 'untitled',
+             "bm_author": '-',
+             "bm_par5": 150,
+             "bm_par4": 110,
+             "bm_par3": 90,
+             "bm_par2": 75,
+             "bm_par1": 60,
+             "bm_fullexp": False,
             },
         "propertytypes":
             {
              "area":"int",
              "version":"int",
              "bunmania":"bool",
+
+             "bm_name": 'string',
+             "bm_author": 'string',
+             "bm_par5": 'float',
+             "bm_par4": 'float',
+             "bm_par3": 'float',
+             "bm_par2": 'float',
+             "bm_par1": 'float',
+             "bm_fullexp": 'bool',
             },
         "type":"map",
         "version":1,
@@ -346,14 +364,14 @@ def read_metadata(properties, property_types):
 
         set_metadata(property_name, properties[property_name])
 
-    get_property('name', 'string', 'untitled')
-    get_property('author', 'string', '-')
-    get_property('par5', 'float', 150)
-    get_property('par4', 'float', 110)
-    get_property('par3', 'float', 90)
-    get_property('par2', 'float', 75)
-    get_property('par1', 'float', 60)
-    get_property('fullexp', 'bool', False)
+    get_property('bm_name', 'string', 'untitled')
+    get_property('bm_author', 'string', '-')
+    get_property('bm_par5', 'float', 150)
+    get_property('bm_par4', 'float', 110)
+    get_property('bm_par3', 'float', 90)
+    get_property('bm_par2', 'float', 75)
+    get_property('bm_par1', 'float', 60)
+    get_property('bm_fullexp', 'bool', False)
 
     return metadata
 
@@ -381,16 +399,16 @@ def apply_metadata(map_arrays, metadata):
         for x, v in enumerate(data):
             map_arrays['event'][row+200*x] = v
 
-    write_into_row(0, get_string_data('map name', metadata['name'], 16))
-    write_into_row(1, get_string_data('author name', metadata['author'], 16))
+    write_into_row(0, get_string_data('map name', metadata['bm_name'], 16))
+    write_into_row(1, get_string_data('author name', metadata['bm_author'], 16))
     
-    write_into_row(2, get_time_data('par5 (bronze)', metadata['par5']))
-    write_into_row(3, get_time_data('par4 (silver)', metadata['par4']))
-    write_into_row(4, get_time_data('par3 (gold)', metadata['par3']))
-    write_into_row(5, get_time_data('par2 (platinum)', metadata['par2']))
-    write_into_row(6, get_time_data('par1 (rainbow)', metadata['par1']))
+    write_into_row(2, get_time_data('par5 (bronze)', metadata['bm_par5']))
+    write_into_row(3, get_time_data('par4 (silver)', metadata['bm_par4']))
+    write_into_row(4, get_time_data('par3 (gold)', metadata['bm_par3']))
+    write_into_row(5, get_time_data('par2 (platinum)', metadata['bm_par2']))
+    write_into_row(6, get_time_data('par1 (rainbow)', metadata['bm_par1']))
 
-    write_into_row(7, get_bool_data('full exp', metadata['fullexp']))
+    write_into_row(7, get_bool_data('full exp', metadata['bm_fullexp']))
 
 
 def json_to_map(filename, settings):

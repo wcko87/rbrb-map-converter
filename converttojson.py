@@ -398,6 +398,9 @@ def apply_metadata(map_arrays, metadata):
     def get_bool_data(bool_name, bool_value):
         return (5000+(1 if bool_value else 0),)
 
+    def get_int_data(int_name, int_value):
+        return (5000+int_value,)
+
     def write_into_row(row, data):
         for x, v in enumerate(data):
             map_arrays['event'][row+200*x] = v
@@ -413,7 +416,7 @@ def apply_metadata(map_arrays, metadata):
 
     write_into_row(7, get_bool_data('full exp', metadata['bm_fullexp']))
 
-    write_into_row(8, get_bool_data('difficulty', metadata['bm_difficulty']))
+    write_into_row(8, get_int_data('difficulty', metadata['bm_difficulty']))
 
 
 def json_to_map(filename, settings):

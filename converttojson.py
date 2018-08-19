@@ -321,6 +321,7 @@ def map_to_json(filename, settings):
              "bm_par2": 75,
              "bm_par1": 60,
              "bm_fullexp": False,
+             "bm_difficulty": 1,
             },
         "propertytypes":
             {
@@ -336,6 +337,7 @@ def map_to_json(filename, settings):
              "bm_par2": 'float',
              "bm_par1": 'float',
              "bm_fullexp": 'bool',
+             "bm_difficulty": "int",
             },
         "type":"map",
         "version":1,
@@ -372,6 +374,7 @@ def read_metadata(properties, property_types):
     get_property('bm_par2', 'float', 75)
     get_property('bm_par1', 'float', 60)
     get_property('bm_fullexp', 'bool', False)
+    get_property('bm_difficulty', 'int', 1)
 
     return metadata
 
@@ -409,6 +412,8 @@ def apply_metadata(map_arrays, metadata):
     write_into_row(6, get_time_data('par1 (rainbow)', metadata['bm_par1']))
 
     write_into_row(7, get_bool_data('full exp', metadata['bm_fullexp']))
+
+    write_into_row(8, get_bool_data('difficulty', metadata['bm_difficulty']))
 
 
 def json_to_map(filename, settings):

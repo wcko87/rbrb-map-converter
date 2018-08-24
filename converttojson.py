@@ -408,7 +408,7 @@ def apply_metadata(map_arrays, metadata):
         for x, v in enumerate(data):
             map_arrays['event'][row+200*x] = v
 
-    write_into_row(0, get_string_data('map name', metadata['bm_name'], 16))
+    write_into_row(0, get_string_data('map name', metadata['bm_name'], 32))
     write_into_row(1, get_string_data('author name', metadata['bm_author'], 16))
     
     write_into_row(2, get_time_data('par5 (bronze)', metadata['bm_par5']))

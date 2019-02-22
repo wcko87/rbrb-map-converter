@@ -346,6 +346,14 @@ def map_to_json(filename, settings):
         "layers": layers,
     }
 
+    extracted_metadata = extract_encoded_metadata(tiledata_event)
+    if extracted_metadata['bm_name'] != None:
+        properties = data['properties']
+        for key, value in extracted_metadata.items():
+            if value != None: properties[key] = value
+        properties['bunmania'] = True
+
+
     f = open(targetfile, 'w+')
     f.write(json.dumps(data))
     f.close()
@@ -420,8 +428,57 @@ def apply_metadata(map_arrays, metadata):
     write_into_row(7, get_bool_data('full exp', metadata['bm_fullexp']))
 
     write_into_row(8, get_int_data('difficulty', metadata['bm_difficulty']))
-    write_into_row(0, get_int_data('number of eggs', metadata['bm_numeggs']))
+    write_into_row(9, get_int_data('number of eggs', metadata['bm_numeggs']))
 
+
+def extract_encoded_metadata(tiledata_event):
+    metadata = {}
+
+    def decode_string_data(data):
+        if len(data) < 1: return None
+        to_chr = lambda v : chr(min(127, max(0, v-5000)))
+        return ''.join(map(to_chr, data))
+
+    def decode_time_data(data):
+        if len(data) < 3: return None
+
+        clamp = lambda v : min(59, max(0, v-5000))
+        mins, secs, millis = map(clamp, data[:3])
+
+        return mins*60 + secs + millis/60
+
+    def decode_bool_data(data):
+        if len(data) < 1: return None
+        return bool(data[0]-5000)
+
+    def decode_int_data(data):
+        if len(data) < 1: return None
+        return data[0]-5000
+
+    def get_raw_data(row, charlimit):
+        data = []
+        for x in range(charlimit):
+            v = tiledata_event[row+200*x]
+            if v < 5000: break
+            data.append(v)
+        return data
+
+    metadata['bm_name'] = decode_string_data(get_raw_data(row=0, charlimit=32))
+    metadata['bm_author'] = decode_string_data(get_raw_data(row=1, charlimit=16))
+
+    metadata['bm_par5'] = decode_time_data(get_raw_data(row=2, charlimit=3))
+    metadata['bm_par4'] = decode_time_data(get_raw_data(row=3, charlimit=3))
+    metadata['bm_par3'] = decode_time_data(get_raw_data(row=4, charlimit=3))
+    metadata['bm_par2'] = decode_time_data(get_raw_data(row=5, charlimit=3))
+    metadata['bm_par1'] = decode_time_data(get_raw_data(row=6, charlimit=3))
+
+    metadata['bm_fullexp'] = decode_bool_data(get_raw_data(row=7, charlimit=1))
+
+    metadata['bm_difficulty'] = decode_int_data(get_raw_data(row=8, charlimit=1))
+    metadata['bm_numeggs'] = decode_int_data(get_raw_data(row=9, charlimit=1))
+
+    return metadata
+    
 
 def json_to_map(filename, settings):
     print('Converting Json -> Final map file : %s' % filename)

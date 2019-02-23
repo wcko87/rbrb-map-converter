@@ -273,6 +273,11 @@ def map_to_json(filename, settings):
     metadata_version = list(struct.unpack('i', f.read(4)))[0]
     f.close()
 
+    extracted_metadata, new_tiledata_event = extract_encoded_metadata(tiledata_event)
+    bunmania_mode = (extracted_metadata['bm_name'] != None)
+    if bunmania_mode:
+        tiledata_event = new_tiledata_event
+
     # layer draw order: 0 3 4 1 5 6 2
     layers = [
         collision_data_to_layer(tiledata_map, "collision"),
@@ -346,8 +351,7 @@ def map_to_json(filename, settings):
         "layers": layers,
     }
 
-    extracted_metadata = extract_encoded_metadata(tiledata_event)
-    if extracted_metadata['bm_name'] != None:
+    if bunmania_mode:
         properties = data['properties']
         for key, value in extracted_metadata.items():
             if value != None: properties[key] = value
@@ -432,6 +436,7 @@ def apply_metadata(map_arrays, metadata):
 
 
 def extract_encoded_metadata(tiledata_event):
+    new_tiledata_event = tiledata_event[:]
     metadata = {}
 
     def decode_string_data(data):
@@ -464,6 +469,7 @@ def extract_encoded_metadata(tiledata_event):
                     v = 5032
                 else:
                     break
+            new_tiledata_event[row+200*x] = 0
             data.append(v)
         return data
 
@@ -481,7 +487,7 @@ def extract_encoded_metadata(tiledata_event):
     metadata['bm_difficulty'] = decode_int_data(get_raw_data(row=8, length=1))
     metadata['bm_numeggs'] = decode_int_data(get_raw_data(row=9, length=1))
 
-    return metadata
+    return metadata, new_tiledata_event
     
 
 def json_to_map(filename, settings):

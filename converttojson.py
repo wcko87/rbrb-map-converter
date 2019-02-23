@@ -437,7 +437,7 @@ def extract_encoded_metadata(tiledata_event):
     def decode_string_data(data):
         if len(data) < 1: return None
         to_chr = lambda v : chr(min(127, max(0, v-5000)))
-        return ''.join(map(to_chr, data))
+        return ''.join(map(to_chr, data)).strip()
 
     def decode_time_data(data):
         if len(data) < 3: return None
@@ -455,27 +455,31 @@ def extract_encoded_metadata(tiledata_event):
         if len(data) < 1: return None
         return data[0]-5000
 
-    def get_raw_data(row, charlimit):
+    def get_raw_data(row, length, blanks_as_spaces=False):
         data = []
-        for x in range(charlimit):
+        for x in range(length):
             v = tiledata_event[row+200*x]
-            if v < 5000: break
+            if v < 5000:
+                if blanks_as_spaces:
+                    v = 5032
+                else:
+                    break
             data.append(v)
         return data
 
-    metadata['bm_name'] = decode_string_data(get_raw_data(row=0, charlimit=32))
-    metadata['bm_author'] = decode_string_data(get_raw_data(row=1, charlimit=16))
+    metadata['bm_name'] = decode_string_data(get_raw_data(row=0, length=32, blanks_as_spaces=True))
+    metadata['bm_author'] = decode_string_data(get_raw_data(row=1, length=16, blanks_as_spaces=True))
 
-    metadata['bm_par5'] = decode_time_data(get_raw_data(row=2, charlimit=3))
-    metadata['bm_par4'] = decode_time_data(get_raw_data(row=3, charlimit=3))
-    metadata['bm_par3'] = decode_time_data(get_raw_data(row=4, charlimit=3))
-    metadata['bm_par2'] = decode_time_data(get_raw_data(row=5, charlimit=3))
-    metadata['bm_par1'] = decode_time_data(get_raw_data(row=6, charlimit=3))
+    metadata['bm_par5'] = decode_time_data(get_raw_data(row=2, length=3))
+    metadata['bm_par4'] = decode_time_data(get_raw_data(row=3, length=3))
+    metadata['bm_par3'] = decode_time_data(get_raw_data(row=4, length=3))
+    metadata['bm_par2'] = decode_time_data(get_raw_data(row=5, length=3))
+    metadata['bm_par1'] = decode_time_data(get_raw_data(row=6, length=3))
 
-    metadata['bm_fullexp'] = decode_bool_data(get_raw_data(row=7, charlimit=1))
+    metadata['bm_fullexp'] = decode_bool_data(get_raw_data(row=7, length=1))
 
-    metadata['bm_difficulty'] = decode_int_data(get_raw_data(row=8, charlimit=1))
-    metadata['bm_numeggs'] = decode_int_data(get_raw_data(row=9, charlimit=1))
+    metadata['bm_difficulty'] = decode_int_data(get_raw_data(row=8, length=1))
+    metadata['bm_numeggs'] = decode_int_data(get_raw_data(row=9, length=1))
 
     return metadata
     

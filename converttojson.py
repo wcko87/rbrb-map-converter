@@ -286,7 +286,7 @@ def map_to_json(filename, settings):
     f.close()
 
     extracted_metadata, new_tiledata_event = extract_encoded_metadata(tiledata_event)
-    bunmania_mode = (extracted_metadata['bm_name'] != None)
+    bunmania_mode = (extracted_metadata['bm_name'] != '')
     if bunmania_mode:
         tiledata_event = new_tiledata_event
 

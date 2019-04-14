@@ -4,6 +4,7 @@ import json
 import os
 import sys
 import argparse
+import math
 
 #settings.original_maps_dir = './s1_original_maps'
 #settings.editable_maps_dir = './s2_editable_maps'
@@ -187,45 +188,56 @@ def minimap_data_to_layer(data, name, color, visible=True):
         "y":0,
     }
 
-
-def collision_layer_to_data(layer_data, firstgid):
-    def rev_idmap(i):
-        if i == 0: return 0
-        x = i & 0x0000FFFF
-        return 0 if x == 0 else x - firstgid
-
-    return transpose_l2d([rev_idmap(i) for i in layer_data['data']])
-
-def object_layer_to_data(layer_data):
+def object_layer_to_data(layer_data, layer_name):
     data = [0]*MAP_SIZE
 
     for item in layer_data['objects']:
-        value = int(item['name'])
-        index = item['x']//32 * 200 + item['y']//32
-        data[index] = value
+        try:
+            value = int(item['name'])
+            if item['x']%32 != 0 or item['y']%32 != 0:
+                warn('Object "%s" with invalid coordinates %.2f, %.2f found in layer "%s". Object will be ignored. Please make sure you have "snap to grid" checked.'
+                    % (item['name'], item['x'], item['y'], layer_name))
+                continue
+            index = item['x']//32 * 200 + item['y']//32
+            data[index] = value
+        except ValueError as e:
+            warn('Object with invalid name "%s" at position %.2f, %.2f in layer "%s". Object will be ignored.'
+                % (item['name'], item['x'], item['y'], layer_name))
 
     return data
 
-def tile_layer_to_data(layer_data, firstgid):
-    def rev_idmap(i):
-        if i == 0: return 0
-        dataid = (i-firstgid) & 0x0000FFFF
-        dataid += 2*(dataid//30)
-        if i & 0x40000000 != 0: dataid += 5000
-        if i & 0x80000000 != 0: dataid = -dataid
-        return dataid
-    return transpose_l2d([rev_idmap(i) for i in layer_data['data']])
+def minimap_layer_to_data(layer_data, layer_name):
+    data = [None]*MINIMAP_SIZE
 
-def minimap_layer_to_data(layer_data):
-    data = [0]*MINIMAP_SIZE
+    def fail_details(item, message):
+        x = '?'
+        if 'x' in item: x = '%.2f' % item['x']
+        y = '?'
+        if 'y' in item: y = '%.2f' % item['y']
+        name = '?'
+        if 'name' in item: name = item['name']
+        fail('Minimap layer "%s", object "%s" at %s, %s: %s' % (layer_name, name, x, y, message))
+
 
     for item in layer_data['objects']:
-        value = int(item['name'])
-        x = item['x']//640
-        y = item['y']//32
-        y = 4*(y//45) + max(0,y%45-1)//11
-        index = x*18 + y
-        data[index] = value
+        try:
+            value = int(item['name'])
+            if item['x']%32 != 0 or item['y']%32 != 0:
+                fail_details(item, 'Minimap tile object not positioned correctly.')
+            x = item['x']//640
+            y = item['y']//32
+            y = 4*(y//45) + max(0,y%45-1)//11
+            index = x*18 + y
+            if data[index] != None:
+                fail_details(item, 'Duplicate minimap tile object.')
+            data[index] = value
+        except ValueError as e:
+            fail_details(item, 'Minimap tile name needs to be a number.')
+
+    for i, val in enumerate(data):
+        if val == None:
+            x, y = i//18, i%18
+            fail('Layer %s\'s map tile at (%d, %d) is missing.' % (layer_name, x, y))
 
     return data
 
@@ -490,6 +502,16 @@ def extract_encoded_metadata(tiledata_event):
     return metadata, new_tiledata_event
     
 
+def convert_to_ranges(first_gids):
+    gid_list = list(first_gids.values())
+    gid_ranges = {}
+    for gid_name in first_gids.keys():
+        first_gid = first_gids[gid_name]
+        end_gid = min([math.inf] + [gid for gid in gid_list if gid > first_gid])
+        gid_ranges[gid_name] = (first_gid, end_gid-first_gid)
+    return gid_ranges
+
+
 def json_to_map(filename, settings):
     print('Converting Json -> Final map file : %s' % filename)
     # location of source map file
@@ -507,30 +529,76 @@ def json_to_map(filename, settings):
     if bunmania_mode:
         metadata = read_metadata(jsondata['properties'], jsondata['propertytypes'])
 
+    gid_ranges = {}
     for tileset in jsondata['tilesets']:
         if 'TILE_A' in tileset['source']:
-            GID_TILES = tileset['firstgid']
+            gid_ranges['tiles'] = tileset['firstgid']
         if 'collision' in tileset['source']:
-            GID_COLLISION = tileset['firstgid']
+            gid_ranges['collision'] = tileset['firstgid']
+    gid_ranges = convert_to_ranges(gid_ranges)
 
     layers = jsondata['layers']
     layers = dict((layer['name'], layer) for layer in layers)
 
-    map_arrays = {
-        "collision": collision_layer_to_data(layers["collision"], GID_COLLISION),
-        "event": object_layer_to_data(layers["event"]),
-        "items": object_layer_to_data(layers["items"]),
-        "roomtype": minimap_layer_to_data(layers["roomtype"]) if "roomtype" in layers else None,
-        "roomcolor": minimap_layer_to_data(layers["roomcolor"]) if "roomcolor" in layers else None,
-        "roombg": minimap_layer_to_data(layers["roombg"]) if "roombg" in layers else None,
-        "tiles0": tile_layer_to_data(layers["tiles0"], GID_TILES),
-        "tiles3": tile_layer_to_data(layers["tiles3"], GID_TILES),
-        "tiles4": tile_layer_to_data(layers["tiles4"], GID_TILES),
-        "tiles1": tile_layer_to_data(layers["tiles1"], GID_TILES),
-        "tiles5": tile_layer_to_data(layers["tiles5"], GID_TILES),
-        "tiles6": tile_layer_to_data(layers["tiles6"], GID_TILES),
-        "tiles2": tile_layer_to_data(layers["tiles2"], GID_TILES),
-    }
+    def warn_index(index, layer_name, message):
+        x, y = index//200, index%200
+        warn('%s(%d,%d) : %s' % (layer_name, x, y, message))
+        return 0
+
+    def collision_layer_to_data(layer_name, gid_name):
+        layer_data = layers[layer_name]
+        first_gid, gid_range = gid_ranges[gid_name]
+
+        def rev_idmap(v):
+            index, i = v
+            if i == 0: return 0
+            dataid = (i&0x0000FFFF) - first_gid
+            if dataid < 0 or dataid >= gid_range:
+                return warn_index(index, layer_name, 'Not a collision tile!')
+            if i & 0xC0000000 != 0:
+                warn_index(index, layer_name, 'Flipped collision tile. Do not flip collision tiles! Flipped collision tiles will be treated as their unflipped versions.')
+            return dataid
+
+        return transpose_l2d(list(map(rev_idmap, enumerate(layer_data['data']))))
+
+    def tile_layer_to_data(layer_name, gid_name):
+        layer_data = layers[layer_name]
+        first_gid, gid_range = gid_ranges[gid_name]
+
+        def rev_idmap(v):
+            index, i = v
+            if i == 0: return 0
+            dataid = (i&0x0000FFFF) - first_gid
+            if dataid < 0 or dataid >= gid_range:
+                return warn_index(index, layer_name, 'Not a tile from the tileset!')
+            dataid += 2*(dataid//30)
+            if i & 0x40000000 != 0: dataid += 5000
+            if i & 0x80000000 != 0: dataid = -dataid
+            return dataid
+
+        return transpose_l2d(list(map(rev_idmap, enumerate(layer_data['data']))))
+
+    try:
+        map_arrays = {
+            "collision": collision_layer_to_data("collision", "collision"),
+            "event": object_layer_to_data(layers["event"], "event"),
+            "items": object_layer_to_data(layers["items"], "items"),
+            "tiles0": tile_layer_to_data("tiles0", "tiles"),
+            "tiles3": tile_layer_to_data("tiles3", "tiles"),
+            "tiles4": tile_layer_to_data("tiles4", "tiles"),
+            "tiles1": tile_layer_to_data("tiles1", "tiles"),
+            "tiles5": tile_layer_to_data("tiles5", "tiles"),
+            "tiles6": tile_layer_to_data("tiles6", "tiles"),
+            "tiles2": tile_layer_to_data("tiles2", "tiles"),
+        }
+        for minimap_name in ["roomtype", "roomcolor", "roombg"]:
+            if minimap_name in layers:
+                map_arrays[minimap_name] = minimap_layer_to_data(layers[minimap_name], minimap_name)
+            else:
+                warn('Minimap layer "%s" not found. All %s tiles be set to the default value 0.' % (minimap_name, minimap_name))
+                map_arrays[minimap_name] = None
+    except KeyError as e:
+        fail('Layer not found: %s. Please create the layer, or check that you have named the layers correctly.' % e)
 
     if bunmania_mode:
         apply_metadata(map_arrays, metadata)

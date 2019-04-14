@@ -4,7 +4,7 @@ import json
 import os
 import sys
 import argparse
-import math
+INF = float('inf')
 
 #settings.original_maps_dir = './s1_original_maps'
 #settings.editable_maps_dir = './s2_editable_maps'
@@ -507,7 +507,7 @@ def convert_to_ranges(first_gids):
     gid_ranges = {}
     for gid_name in first_gids.keys():
         first_gid = first_gids[gid_name]
-        end_gid = min([math.inf] + [gid for gid in gid_list if gid > first_gid])
+        end_gid = min([INF] + [gid for gid in gid_list if gid > first_gid])
         gid_ranges[gid_name] = (first_gid, end_gid-first_gid)
     return gid_ranges
 
